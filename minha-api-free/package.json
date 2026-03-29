@@ -1,6 +1,7 @@
 {
-  "name": "minha-api-nr-light",
-  "version": "2.2.0",
+  "name": "minha-api-nr-final",
+  "version": "3.0.0",
+  "description": "API Completa e Estável para o Bot NR",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

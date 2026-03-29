@@ -1,7 +1,7 @@
 {
   "name": "minha-api-free",
-  "version": "1.1.0",
-  "description": "API Oficial do Bot NR - Independência Total",
+  "version": "1.5.0",
+  "description": "API Completa NR - Música, Figurinhas e Welcome",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -15,6 +15,7 @@
     "canvas": "^2.11.2",
     "jimp": "^0.22.10",
     "yt-search": "^2.10.4",
-    "path": "^0.12.7"
+    "form-data": "^4.0.0",
+    "fs-extra": "^11.1.1"
   }
 }

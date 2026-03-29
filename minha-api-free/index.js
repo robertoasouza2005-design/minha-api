@@ -3,13 +3,14 @@ const cors = require("cors");
 const ytdl = require("@distube/ytdl-core");
 const yts = require("yt-search");
 const Jimp = require("jimp");
+require("dotenv").config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-const API_KEY = "NR_OFICIAL_2026";
+const API_KEY = process.env.API_KEY || "NR_OFICIAL_2026";
 const PORT = process.env.PORT || 3000;
 
 function isAuthorized(apikey) {
@@ -17,15 +18,79 @@ function isAuthorized(apikey) {
 }
 
 function sendForbidden(res) {
-  return res.status(403).json({ status: false, resultado: "Acesso Negado" });
+  return res.status(403).json({
+    status: false,
+    resultado: "Acesso negado"
+  });
 }
 
+function normalizeTitle(title = "media") {
+  return String(title).replace(/[^\w\s.-]/g, "").trim() || "media";
+}
+
+// HEALTHCHECK
+app.get("/", (req, res) => {
+  return res.status(200).json({
+    status: true,
+    message: "API NR online",
+    uptime: process.uptime()
+  });
+});
+
+app.get("/health", (req, res) => {
+  return res.status(200).json({
+    status: true,
+    message: "API saudável"
+  });
+});
+
+// YTSEARCH
+app.get("/api/ytsearch", async (req, res) => {
+  const { q, apikey } = req.query;
+
+  if (!isAuthorized(apikey)) return sendForbidden(res);
+  if (!q) {
+    return res.status(400).json({
+      status: false,
+      resultado: "Faltou o termo da pesquisa"
+    });
+  }
+
+  try {
+    const search = await yts(q);
+    const videos = (search?.videos || []).slice(0, 10).map((video) => ({
+      titulo: video.title,
+      thumb: video.thumbnail,
+      canal: video.author?.name || "Desconhecido",
+      views: video.views,
+      publicado: video.ago,
+      duracao: video.timestamp,
+      url: video.url
+    }));
+
+    return res.status(200).json({
+      status: true,
+      resultado: videos
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      resultado: "Erro ao pesquisar no YouTube",
+      error: error.message
+    });
+  }
+});
+
+// YTPLAY
 app.get("/api/ytplayv2", async (req, res) => {
   const { nome, apikey } = req.query;
 
   if (!isAuthorized(apikey)) return sendForbidden(res);
   if (!nome) {
-    return res.status(400).json({ status: false, resultado: "Faltou o nome" });
+    return res.status(400).json({
+      status: false,
+      resultado: "Faltou o nome da pesquisa"
+    });
   }
 
   try {
@@ -33,12 +98,13 @@ app.get("/api/ytplayv2", async (req, res) => {
     const video = search?.videos?.[0];
 
     if (!video) {
-      return res
-        .status(404)
-        .json({ status: false, resultado: "Não encontrado" });
+      return res.status(404).json({
+        status: false,
+        resultado: "Nenhum resultado encontrado"
+      });
     }
 
-    return res.json({
+    return res.status(200).json({
       status: true,
       resultado: {
         titulo: video.title,
@@ -46,36 +112,37 @@ app.get("/api/ytplayv2", async (req, res) => {
         canal: video.author?.name || "Desconhecido",
         views: video.views,
         publicado: video.ago,
-        link: `https://${req.get("host")}/api/download?url=${encodeURIComponent(video.url)}&apikey=${API_KEY}`
+        duracao: video.timestamp,
+        url: video.url,
+        mp3: `${req.protocol}://${req.get("host")}/api/ytmp3?url=${encodeURIComponent(video.url)}&apikey=${encodeURIComponent(API_KEY)}`,
+        mp4: `${req.protocol}://${req.get("host")}/api/ytmp4?url=${encodeURIComponent(video.url)}&apikey=${encodeURIComponent(API_KEY)}`
       }
     });
-  } catch (e) {
-    return res
-      .status(500)
-      .json({ status: false, resultado: "Erro no Servidor NR" });
+  } catch (error) {
+    return res.status(500).json({
+      status: false,
+      resultado: "Erro ao buscar vídeo",
+      error: error.message
+    });
   }
 });
 
-app.get("/api/download", async (req, res) => {
+// YTMP3
+app.get("/api/ytmp3", async (req, res) => {
   const { url, apikey } = req.query;
 
   if (!isAuthorized(apikey)) return res.status(403).send("Não autorizado");
   if (!url) return res.status(400).send("URL ausente");
   if (!ytdl.validateURL(url)) return res.status(400).send("URL inválida");
 
-  let responded = false;
+  let finished = false;
 
   try {
     const info = await ytdl.getInfo(url);
-    const title = (info?.videoDetails?.title || "audio")
-      .replace(/[^\w\s.-]/g, "")
-      .trim();
+    const safeTitle = normalizeTitle(info?.videoDetails?.title || "audio");
 
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${title || "audio"}.mp3"`
-    );
+    res.setHeader("Content-Disposition", `inline; filename="${safeTitle}.mp3"`);
     res.setHeader("Cache-Control", "no-store");
 
     const stream = ytdl(url, {
@@ -85,25 +152,32 @@ app.get("/api/download", async (req, res) => {
     });
 
     const timeout = setTimeout(() => {
-      if (!responded) {
-        responded = true;
-        stream.destroy(new Error("Timeout no download"));
+      if (!finished) {
+        finished = true;
+        stream.destroy(new Error("Timeout no download mp3"));
         if (!res.headersSent) {
           res.status(504).send("Tempo limite excedido");
+        } else {
+          res.end();
         }
       }
     }, 45000);
 
     stream.on("error", () => {
       clearTimeout(timeout);
-      if (!responded) {
-        responded = true;
+      if (!finished) {
+        finished = true;
         if (!res.headersSent) {
-          res.status(502).send("Erro Youtube");
+          res.status(502).send("Erro ao processar mp3");
         } else {
           res.end();
         }
       }
+    });
+
+    stream.on("end", () => {
+      clearTimeout(timeout);
+      finished = true;
     });
 
     res.on("close", () => {
@@ -111,23 +185,87 @@ app.get("/api/download", async (req, res) => {
       stream.destroy();
     });
 
-    stream.on("end", () => {
-      clearTimeout(timeout);
-    });
-
     stream.pipe(res);
-  } catch (e) {
-    if (!responded) {
-      responded = true;
-      return res.status(502).send("Erro Youtube");
+  } catch (error) {
+    if (!finished) {
+      finished = true;
+      return res.status(500).send("Erro interno no mp3");
     }
   }
 });
 
+// YTMP4
+app.get("/api/ytmp4", async (req, res) => {
+  const { url, apikey } = req.query;
+
+  if (!isAuthorized(apikey)) return res.status(403).send("Não autorizado");
+  if (!url) return res.status(400).send("URL ausente");
+  if (!ytdl.validateURL(url)) return res.status(400).send("URL inválida");
+
+  let finished = false;
+
+  try {
+    const info = await ytdl.getInfo(url);
+    const safeTitle = normalizeTitle(info?.videoDetails?.title || "video");
+
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Disposition", `inline; filename="${safeTitle}.mp4"`);
+    res.setHeader("Cache-Control", "no-store");
+
+    const stream = ytdl(url, {
+      filter: "audioandvideo",
+      quality: "highest",
+      highWaterMark: 1 << 24
+    });
+
+    const timeout = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        stream.destroy(new Error("Timeout no download mp4"));
+        if (!res.headersSent) {
+          res.status(504).send("Tempo limite excedido");
+        } else {
+          res.end();
+        }
+      }
+    }, 60000);
+
+    stream.on("error", () => {
+      clearTimeout(timeout);
+      if (!finished) {
+        finished = true;
+        if (!res.headersSent) {
+          res.status(502).send("Erro ao processar mp4");
+        } else {
+          res.end();
+        }
+      }
+    });
+
+    stream.on("end", () => {
+      clearTimeout(timeout);
+      finished = true;
+    });
+
+    res.on("close", () => {
+      clearTimeout(timeout);
+      stream.destroy();
+    });
+
+    stream.pipe(res);
+  } catch (error) {
+    if (!finished) {
+      finished = true;
+      return res.status(500).send("Erro interno no mp4");
+    }
+  }
+});
+
+// CANVAS
 app.get("/api/canvas/welcome", async (req, res) => {
   const { titulo, apikey } = req.query;
 
-  if (!isAuthorized(apikey)) return res.status(403).send("Erro");
+  if (!isAuthorized(apikey)) return res.status(403).send("Não autorizado");
 
   try {
     const image = new Jimp(800, 400, 0x000000ff);
@@ -138,16 +276,9 @@ app.get("/api/canvas/welcome", async (req, res) => {
     const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
     res.setHeader("Content-Type", "image/jpeg");
     return res.send(buffer);
-  } catch (e) {
+  } catch (error) {
     return res.status(500).send("Erro ao gerar imagem");
   }
-});
-
-app.get("/", (req, res) => {
-  res.json({
-    status: true,
-    message: "API NR online"
-  });
 });
 
 app.listen(PORT, () => {

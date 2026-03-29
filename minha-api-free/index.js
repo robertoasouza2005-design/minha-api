@@ -8,53 +8,45 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// A chave que o seu bot NR usa para se conectar
+// CHAVE QUE O SEU BOT NR USA
 const API_KEY = "Bronxys30092025";
 
-// --- ROTA DE PESQUISA (O QUE O BOT CHAMA PRIMEIRO) ---
-app.get('/play', async (req, res) => {
+// --- ROTA DE MÚSICA (PEDIDA PELO REQ.JS DO SEU BOT) ---
+app.get('/api/ytplayv2', async (req, res) => {
     const { nome, apikey } = req.query;
 
-    if (apikey !== API_KEY) {
-        return res.status(403).json({ status: false, resultado: "APIKEY Inválida" });
-    }
-
-    if (!nome) {
-        return res.status(400).json({ status: false, resultado: "Faltou o nome da música" });
-    }
+    if (apikey !== API_KEY) return res.status(403).json({ status: false, resultado: "APIKEY Inválida" });
+    if (!nome) return res.status(400).json({ status: false, resultado: "Faltou o nome da música" });
 
     try {
         const search = await yts(nome);
         const video = search.videos[0];
 
-        if (!video) {
-            return res.status(404).json({ status: false, resultado: "Música não encontrada" });
-        }
+        if (!video) return res.status(404).json({ status: false, resultado: "Música não encontrada" });
 
-        // Responde em JSON para o bot não dar erro de leitura
+        // Retorna o JSON exatamente como o seu Bot NR espera ler
         res.json({
             status: true,
             resultado: {
                 titulo: video.title,
                 thumb: video.thumbnail,
                 canal: video.author.name,
-                duracao: video.timestamp,
                 views: video.views,
-                link: `https://${req.get('host')}/download?url=${encodeURIComponent(video.url)}&apikey=${API_KEY}`
+                publicado: video.ago,
+                link: `https://${req.get('host')}/api/download?url=${encodeURIComponent(video.url)}&apikey=${API_KEY}`
             }
         });
 
-    } catch (error) {
-        console.error(error);
+    } catch (e) {
+        console.error(e);
         res.status(500).json({ status: false, resultado: "Erro interno na API" });
     }
 });
 
-// --- ROTA DE DOWNLOAD REAL DO ÁUDIO ---
-app.get('/download', async (req, res) => {
+// --- ROTA DE DOWNLOAD QUE A API USA ---
+app.get('/api/download', async (req, res) => {
     const { url, apikey } = req.query;
-
-    if (apikey !== API_KEY) return res.status(403).send("Acesso negado");
+    if (apikey !== API_KEY) return res.status(403).send("Acesso Negado");
 
     try {
         const stream = ytdl(url, {
@@ -70,13 +62,14 @@ app.get('/download', async (req, res) => {
     }
 });
 
-// --- ROTA DE BOAS-VINDAS (WELCOME - JIMP LEVE) ---
-app.get('/welcome', async (req, res) => {
+// --- ROTA DE BOAS-VINDAS (PEDIDA NA LINHA 794 DO SEU INICIAR.JS) ---
+app.get('/api/canvas/welcome', async (req, res) => {
     const { titulo, nome, apikey } = req.query;
 
-    if (apikey !== API_KEY) return res.status(403).send("Erro");
+    if (apikey !== API_KEY) return res.status(403).send("Erro de Chave");
 
     try {
+        // Cria imagem 800x400 preta (Mais leve que o Canvas)
         const image = new Jimp(800, 400, 0x000000FF);
         const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
         
@@ -87,14 +80,14 @@ app.get('/welcome', async (req, res) => {
         res.setHeader('Content-Type', 'image/png');
         res.send(buffer);
     } catch (e) {
-        res.status(500).send("Erro na imagem");
+        res.status(500).send("Erro ao gerar imagem");
     }
 });
 
-// Rota de status para o Render não derrubar a API
-app.get('/', (req, res) => res.json({ status: "online", bot: "NR-API" }));
+// Rota de Teste Simples
+app.get('/', (req, res) => res.json({ status: "online", bot: "NR-API v3.1" }));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`[API NR] Rodando com sucesso na porta ${PORT}`);
+    console.log(`[API NR] Sistema rodando e compatível com o bot!`);
 });

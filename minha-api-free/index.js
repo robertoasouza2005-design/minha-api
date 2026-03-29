@@ -3,41 +3,46 @@ const ytdl = require('ytdl-core');
 const yts = require('yt-search');
 const ffmpeg = require('fluent-ffmpeg');
 const axios = require('axios');
-const fs = require('fs');
 const app = express();
 
-app.get('/', (req, res) => res.send('Sua API Própria está Online! 🚀'));
+app.get('/', (req, res) => res.send('🚀 API Privada Aleatory Online!'));
 
-// --- ROTA DE MÚSICA (!play) ---
+// Rota de música
 app.get('/play', async (req, res) => {
     const query = req.query.nome;
-    if (!query) return res.status(400).send("Diga o nome da música!");
+    if (!query) return res.status(400).send("Falta o nome da música");
     try {
         const search = await yts(query);
         const video = search.videos[0];
-        if (!video) return res.status(404).send("Vídeo não encontrado.");
-        
+        if (!video) return res.status(404).send("Não encontrado");
         res.header('Content-Disposition', `attachment; filename="audio.mp3"`);
         ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio' }).pipe(res);
-    } catch (e) { res.status(500).send("Erro no YouTube"); }
+    } catch (e) { res.status(500).send("Erro no processamento"); }
 });
 
-// --- ROTA DE FIGURINHA (!s) ---
-// Transforma link de imagem em figurinha .webp
+// Rota de figurinha
 app.get('/sticker', async (req, res) => {
     const imgUrl = req.query.url;
-    if (!imgUrl) return res.status(400).send("Falta a URL da imagem");
-    
+    if (!imgUrl) return res.status(400).send("URL necessária");
     try {
         const response = await axios({ url: imgUrl, responseType: 'stream' });
         res.setHeader('Content-Type', 'image/webp');
-        
-        // O FFmpeg faz a mágica de redimensionar e converter para .webp (formato de figurinha)
-        ffmpeg(response.data)
-            .format('webp')
-            .size('512x512')
-            .pipe(res, { end: true });
-    } catch (e) { res.status(500).send("Erro ao converter imagem"); }
+        ffmpeg(response.data).format('webp').size('512x512').pipe(res);
+    } catch (e) { res.status(500).send("Erro na figurinha"); }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log("API RODANDO!"));
+// Rota de busca do YouTube (O bot vai precisar disso)
+app.get('/pesquisa_ytb', async (req, res) => {
+    try {
+        const search = await yts(req.query.nome);
+        res.json(search.videos);
+    } catch (e) { res.status(500).json({ erro: "Erro na busca" }); }
+});
+
+// Rota simples de Boas-vindas
+app.get('/welcome', (req, res) => {
+    res.redirect('https://i.imgur.com/6U9S9uO.png'); 
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`API rodando na porta ${PORT}`));

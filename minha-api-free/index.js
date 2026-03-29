@@ -1,70 +1,77 @@
 const express = require('express');
+const cors = require('cors');
 const ytdl = require('@distube/ytdl-core');
 const yts = require('yt-search');
-const axios = require('axios');
+const { createCanvas, loadImage } = require('canvas');
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs-extra');
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-app.get('/', (req, res) => {
-    res.send('✅ API NR Independente Ativa!');
-});
+app.use(cors());
+app.use(express.json());
 
-// --- ROTA DE PESQUISA ---
-app.get('/pesquisa_ytb', async (req, res) => {
-    const { nome } = req.query;
-    if (!nome) return res.status(400).json({ error: 'Falta o nome' });
-    try {
-        const search = await yts(nome);
-        res.json(search.all[0]);
-    } catch (e) {
-        res.status(500).json({ error: 'Erro na pesquisa' });
-    }
-});
+const MINHA_CHAVE = "Bronxys30092025"; 
 
-// --- ROTA PLAY (ÁUDIO) COM BUFFER OTIMIZADO ---
+// --- ROTA DE MÚSICA (!PLAY) ---
 app.get('/play', async (req, res) => {
-    const { nome } = req.query;
-    if (!nome) return res.status(400).json({ error: 'Falta o nome' });
+    const { nome, apikey } = req.query;
+    if (apikey !== MINHA_CHAVE) return res.status(403).send("Chave Inválida");
+    
     try {
         const search = await yts(nome);
         const video = search.videos[0];
-        if (!video) return res.status(404).json({ error: 'Vídeo não encontrado' });
+        if (!video) return res.status(404).send("Vídeo não encontrado");
 
         const stream = ytdl(video.url, {
             filter: 'audioonly',
             quality: 'highestaudio',
-            highWaterMark: 1 << 25 // 32MB de buffer para evitar erro 502
+            highWaterMark: 1 << 25
         });
 
         res.setHeader('Content-Type', 'audio/mpeg');
         stream.pipe(res);
     } catch (e) {
-        res.status(500).send('Erro ao processar áudio');
+        res.status(502).send("Erro no processamento da música");
     }
 });
 
-// --- ROTA WELCOME (IMAGEM DE BOAS-VINDAS) ---
+// --- ROTA DE FIGURINHAS (STICKER) ---
+// Essa rota ajuda o bot a converter imagens em WebP (formato de figurinha)
+app.post('/sticker', async (req, res) => {
+    // Aqui entra o processamento de imagem para figurinha
+    // O bot envia a imagem, a API usa o Ffmpeg e devolve o WebP
+    res.send("Motor de figurinhas ativo");
+});
+
+// --- ROTA DE BOAS-VINDAS (WELCOME) ---
 app.get('/welcome', async (req, res) => {
-    const { titulo, nome, perfil, grupo, membros } = req.query;
-    // Aqui podes usar uma canvas ou apenas redirecionar para uma API de imagem
-    // Por enquanto, vamos redirecionar para um gerador de imagem dinâmico
-    const welcomeImg = `https://api.clau.me/api/canvas/welcome?titulo=${titulo}&nome=${nome}&perfil=${perfil}&grupo=${grupo}&membros=${membros}&tema=dark`;
-    
+    const { titulo, nome, perfil, grupo, apikey } = req.query;
+    if (apikey !== MINHA_CHAVE) return res.status(403).send("Acesso Negado");
+
     try {
-        const response = await axios.get(welcomeImg, { responseType: 'arraybuffer' });
+        const canvas = createCanvas(800, 400);
+        const ctx = canvas.getContext('2d');
+
+        // Fundo (pode ser uma cor ou imagem)
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 800, 400);
+
+        // Texto
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 50px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(titulo || "BEM-VINDO", 400, 150);
+        ctx.font = '30px sans-serif';
+        ctx.fillText(nome || "Novo Membro", 400, 220);
+        ctx.fillText(`Grupo: ${grupo || "NR-Bot"}`, 400, 280);
+
+        const buffer = canvas.toBuffer('image/png');
         res.setHeader('Content-Type', 'image/png');
-        res.send(response.data);
+        res.send(buffer);
     } catch (e) {
-        res.status(500).send('Erro ao gerar imagem');
+        res.status(500).send("Erro na imagem");
     }
 });
 
-// --- ROTA STICKER ---
-app.get('/sticker', async (req, res) => {
-    const { url } = req.query;
-    if (!url) return res.status(400).send('Falta a URL');
-    // Redireciona para o processamento de imagem
-    res.redirect(url); 
-});
-
-app.listen(PORT, () => console.log(`Servidor na porta ${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`API NR COMPLETA RODANDO NA PORTA ${PORT}`));

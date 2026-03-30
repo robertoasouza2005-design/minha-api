@@ -1,7 +1,7 @@
 {
   "name": "minha-api-nr-oficial",
-  "version": "3.4.0",
-  "description": "API NR para YouTube, canvas e utilidades do bot",
+  "version": "3.5.0",
+  "description": "API NR para YouTube, canvas, healthcheck e utilidades do bot",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {

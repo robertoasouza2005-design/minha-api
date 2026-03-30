@@ -20,7 +20,7 @@ function isAuthorized(apikey) {
 function sendForbidden(res) {
   return res.status(403).json({
     status: false,
-    resultado: "Acesso Negado"
+    resultado: "Acesso negado"
   });
 }
 
@@ -57,9 +57,9 @@ function getBestAudioFormat(info) {
   return formats[0];
 }
 
-// STATUS
+// HEALTHCHECK
 app.get("/", (req, res) => {
-  res.json({
+  return res.status(200).json({
     status: true,
     message: "API NR online",
     uptime: process.uptime()
@@ -67,13 +67,13 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({
+  return res.status(200).json({
     status: true,
     message: "API saudável"
   });
 });
 
-// PESQUISA YOUTUBE
+// YTSEARCH
 app.get("/api/ytsearch", async (req, res) => {
   const { q, apikey } = req.query;
 
@@ -105,12 +105,13 @@ app.get("/api/ytsearch", async (req, res) => {
     console.log("ERRO YTSEARCH:", error);
     return res.status(500).json({
       status: false,
-      resultado: "Erro ao pesquisar no YouTube"
+      resultado: "Erro ao pesquisar no YouTube",
+      error: error.message
     });
   }
 });
 
-// YTPLAYV2
+// YTPLAY
 app.get("/api/ytplayv2", async (req, res) => {
   const { nome, apikey } = req.query;
 
@@ -118,7 +119,7 @@ app.get("/api/ytplayv2", async (req, res) => {
   if (!nome) {
     return res.status(400).json({
       status: false,
-      resultado: "Faltou o nome"
+      resultado: "Faltou o nome da pesquisa"
     });
   }
 
@@ -129,11 +130,11 @@ app.get("/api/ytplayv2", async (req, res) => {
     if (!video) {
       return res.status(404).json({
         status: false,
-        resultado: "Não encontrado"
+        resultado: "Nenhum resultado encontrado"
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       status: true,
       resultado: {
         titulo: video.title,
@@ -143,15 +144,16 @@ app.get("/api/ytplayv2", async (req, res) => {
         publicado: video.ago,
         duracao: video.timestamp,
         url: video.url,
-        mp3: `${req.protocol}://${req.get("host")}/api/ytmp3?url=${encodeURIComponent(video.url)}&apikey=${API_KEY}`,
-        mp4: `${req.protocol}://${req.get("host")}/api/ytmp4?url=${encodeURIComponent(video.url)}&apikey=${API_KEY}`
+        mp3: `${req.protocol}://${req.get("host")}/api/ytmp3?url=${encodeURIComponent(video.url)}&apikey=${encodeURIComponent(API_KEY)}`,
+        mp4: `${req.protocol}://${req.get("host")}/api/ytmp4?url=${encodeURIComponent(video.url)}&apikey=${encodeURIComponent(API_KEY)}`
       }
     });
   } catch (error) {
     console.log("ERRO YTPLAYV2:", error);
     return res.status(500).json({
       status: false,
-      resultado: "Erro no Servidor NR"
+      resultado: "Erro ao buscar vídeo",
+      error: error.message
     });
   }
 });
@@ -302,22 +304,11 @@ app.get("/api/ytmp4", async (req, res) => {
   }
 });
 
-// COMPATIBILIDADE ANTIGA
-app.get("/api/download", async (req, res) => {
-  const { url, apikey } = req.query;
-  if (!isAuthorized(apikey)) return res.status(403).send("Não autorizado");
-  if (!url) return res.status(400).send("URL ausente");
-
-  req.query.url = url;
-  req.query.apikey = apikey;
-  return app._router.handle(req, res, () => {}, "get", "/api/ytmp3");
-});
-
 // CANVAS
 app.get("/api/canvas/welcome", async (req, res) => {
   const { titulo, apikey } = req.query;
 
-  if (!isAuthorized(apikey)) return res.status(403).send("Erro");
+  if (!isAuthorized(apikey)) return res.status(403).send("Não autorizado");
 
   try {
     const image = new Jimp(800, 400, 0x000000ff);
@@ -328,8 +319,8 @@ app.get("/api/canvas/welcome", async (req, res) => {
     const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
     res.setHeader("Content-Type", "image/jpeg");
     return res.send(buffer);
-  } catch (e) {
-    console.log("ERRO CANVAS:", e);
+  } catch (error) {
+    console.log("ERRO CANVAS:", error);
     return res.status(500).send("Erro ao gerar imagem");
   }
 });

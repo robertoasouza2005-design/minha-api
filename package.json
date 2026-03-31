@@ -1,13 +1,12 @@
 {
   "name": "minha-api-nr-oficial",
   "version": "4.2.1",
-  "description": "API NR evoluída para YouTube, social, imagem, healthcheck e utilidades do bot",
+  "description": "API NR organizada para YouTube, social, imagem, healthcheck e utilidades do bot",
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js",
-    "check:binaries": "node scripts/check-binaries.js"
+    "dev": "node index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -17,7 +16,7 @@
     "yt-search": "^2.10.4"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "22.x"
   },
   "author": "NR-Project",
   "license": "MIT"

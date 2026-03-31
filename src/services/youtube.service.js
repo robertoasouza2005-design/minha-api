@@ -18,11 +18,10 @@ const {
 // ════════════════════════════════════════════════════════════════════════════════
 // CONFIG
 // ════════════════════════════════════════════════════════════════════════════════
-const BIN_TIMEOUT_MS = 15000;
-const INFO_TIMEOUT_MS = 45000;
-const DOWNLOAD_TIMEOUT_MP3_MS = 120000;
-const DOWNLOAD_TIMEOUT_MP4_MS = 180000;
-
+const BIN_TIMEOUT_MS = 60000;
+const INFO_TIMEOUT_MS = 90000;
+const DOWNLOAD_TIMEOUT_MP3_MS = 240000;
+const DOWNLOAD_TIMEOUT_MP4_MS = 300000;
 // ════════════════════════════════════════════════════════════════════════════════
 // HELPERS DE LOG
 // ════════════════════════════════════════════════════════════════════════════════
@@ -173,7 +172,11 @@ function runCommandWithTimeout(bin, args, timeoutMs, label = "command") {
 // ════════════════════════════════════════════════════════════════════════════════
 // BINÁRIOS
 // ════════════════════════════════════════════════════════════════════════════════
+let _binariesChecked = false;
+
 async function ensureBinaries() {
+  if (_binariesChecked) return;
+
   await runCommandWithTimeout(
     YTDLP_BIN || "yt-dlp",
     ["--version"],
@@ -187,8 +190,9 @@ async function ensureBinaries() {
     BIN_TIMEOUT_MS,
     "ffmpeg-version",
   );
-}
 
+  _binariesChecked = true;
+}
 // ════════════════════════════════════════════════════════════════════════════════
 // SEARCH / PLAY
 // ════════════════════════════════════════════════════════════════════════════════

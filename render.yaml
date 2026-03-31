@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: minha-api
+    env: docker
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: API_KEY
+        value: NR_OFICIAL_2026
+      - key: PORT
+        value: 10000
+      - key: API_NAME
+        value: NR API
+      - key: API_VERSION
+        value: 4.2.1
+      - key: YTDLP_BIN
+        value: yt-dlp
+      - key: FFMPEG_BIN
+        value: ffmpeg
+      - key: GALLERYDL_BIN
+        value: gallery-dl
+      - key: TEMP_DIR
+        value: ./tmp
+      - key: ENABLE_LEGACY_YT_ROUTES
+        value: true

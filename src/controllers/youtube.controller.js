@@ -24,11 +24,15 @@ async function ytPlay(req, res) {
 
 function pipeMedia(res, media, fallbackMessage) {
   res.setHeader("Content-Type", media.contentType);
-  res.setHeader("Content-Disposition", `inline; filename="${media.fileName}"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${media.fileName}"`);
   res.setHeader("Cache-Control", "no-store");
-  res.setHeader("X-Download-Provider", media.selectedProvider || media.provider || "unknown");
+  res.setHeader(
+    "X-Download-Provider",
+    media.selectedProvider || media.provider || "unknown",
+  );
+
   if (Array.isArray(media.attempts)) {
-    res.setHeader("X-Download-Attempts", String(media.attempts.length + 1));
+    res.setHeader("X-Download-Attempts", String(media.attempts.length || 1));
   }
 
   const cleanup = () => {
@@ -37,19 +41,22 @@ function pipeMedia(res, media, fallbackMessage) {
   };
 
   const stream = fs.createReadStream(media.filePath);
+
   stream.on("error", () => {
     cleanup();
     if (!res.headersSent) fail(res, fallbackMessage, 502);
     else res.end();
   });
+
   stream.on("close", cleanup);
+
   res.on("close", () => {
     stream.destroy();
     cleanup();
   });
+
   stream.pipe(res);
 }
-
 async function ytMp3(req, res) {
   const url = sanitizeUrl(req.query.url);
   if (!url) return fail(res, "URL inválida ou ausente", 400);
